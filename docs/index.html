@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vuelos AEP/EZE → CNQ</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 1rem; }
+    h1 { text-align: center; }
+    section { margin-bottom: 2rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
+    small { color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Vuelos del día a Corrientes (CNQ)</h1>
+  <section id="aep">
+    <h2>✈️ Aeroparque (AEP) → Corrientes</h2>
+    <div id="aep-content">Cargando...</div>
+  </section>
+  <section id="eze">
+    <h2>✈️ Ezeiza (EZE) → Corrientes</h2>
+    <div id="eze-content">Cargando...</div>
+  </section>
+  <script>
+    const sections = [
+      { id: 'aep', file: 'data/vuelos-aep.json' },
+      { id: 'eze', file: 'data/vuelos-eze.json' }
+    ];
+
+    sections.forEach(sec => {
+      fetch(sec.file)
+        .then(res => res.json())
+        .then(data => {
+          const container = document.getElementById(sec.id + '-content');
+          if (!data || data.length === 0) {
+            container.innerHTML = '<p>No hay vuelos para hoy.</p>';
+            return;
+          }
+          const table = document.createElement('table');
+          const thead = table.createTHead();
+          const headerRow = thead.insertRow();
+          ['Salida', 'Aerolínea', 'Vuelo', 'Estado', 'Estimado llegada'].forEach(text => {
+            const th = document.createElement('th');
+            th.textContent = text;
+            headerRow.appendChild(th);
+          });
+          const tbody = table.createTBody();
+          data.forEach(f => {
+            const row = tbody.insertRow();
+            row.insertCell().textContent = f.hora_salida;
+            row.insertCell().textContent = f.aerolinea;
+            row.insertCell().textContent = f.numero_vuelo;
+            row.insertCell().textContent = f.estado;
+            row.insertCell().innerHTML = `<small>Estimado: ${f.hora_estimada_llegada}</small>`;
+          });
+          container.innerHTML = '';
+          container.appendChild(table);
+        })
+        .catch(err => {
+          document.getElementById(sec.id + '-content').innerHTML = '<p>Error cargando datos.</p>';
+          console.error(err);
+        });
+    });
+  </script>
+</body>
+</html>
