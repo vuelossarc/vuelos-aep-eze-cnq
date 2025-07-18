@@ -36,5 +36,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add frontend/public/data/*.json
-          git commit -m "Actualización diaria de vuelos"
-          git push
+
+          # Si no hay cambios, salimos sin error
+          if git diff --cached --quiet; then
+            echo "No hay cambios en los JSON — nada que commitear."
+          else
+            git commit -m "Actualización diaria de vuelos"
+            git push
+          fi
+
