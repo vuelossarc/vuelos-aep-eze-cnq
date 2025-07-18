@@ -1,73 +1,57 @@
-import os, json, time
+import requests
+from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+import json, os
 
-URL = "https://www.aeropuertosargentina.com/es/vuelos"
-AIRPORTS = {"AEP": "Aeroparque", "EZE": "Ezeiza"}
+BASE = "https://www.aeropuertosargentina.com/es/vuelos"
+
+# Nombre legible para el parámetro idarpt
+AEROPUERTOS = {
+    "AEP": "Aeroparque",
+    "EZE": "Ezeiza"
+}
 
 def fetch_vuelos(code):
-    opts = Options()
-    opts.add_argument("--headless")
-    opts.add_argument("--no-sandbox")
-    opts.add_argument("--disable-dev-shm-usage")
-    # opts.binary_location = "/usr/bin/google-chrome-stable"  # si hiciera falta
+    # Fecha hoy en DD‑MM‑YYYY
+    hoy = datetime.now().strftime("%d-%m-%Y")
+    params = {
+        "movtp": "partidas",
+        "idarpt": f"{AEROPUERTOS[code]}, {code}",
+        "fecha": hoy,
+        "destorig": "Corrientes"
+    }
+    res = requests.get(BASE, params=params)
+    res.raise_for_status()
+    soup = BeautifulSoup(res.text, "html.parser")
 
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=opts
-    )
-    driver.get(URL)
-
-    wait = WebDriverWait(driver, 30)
-    # 1) Seleccionar aeropuerto
-    sel = wait.until(EC.presence_of_element_located((By.NAME, "idarpt")))
-    Select(sel).select_by_visible_text(f"{AIRPORTS[code]}, {code}")
-
-    # 2) Ingresar fecha de hoy (DD-MM-YYYY)
-    inp_date = driver.find_element(By.NAME, "fecha")
-    inp_date.clear()
-    inp_date.send_keys(datetime.now().strftime("%d-%m-%Y"))
-
-    # 3) Ingresar destino “Corrientes”
-    inp_dest = driver.find_element(By.NAME, "destorig")
-    inp_dest.clear()
-    inp_dest.send_keys("Corrientes")
-
-    # 4) Hacer click en el botón de búsqueda
-    driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
-
-    # 5) Esperar tabla de resultados
-    tbody = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table#flightResults tbody")))
-    time.sleep(1)
-    rows = tbody.find_elements(By.TAG_NAME, "tr")
+    tabla = soup.select_one("table#flightResults tbody")
+    if not tabla:
+        return []
 
     vuelos = []
-    for row in rows:
-        cols = row.find_elements(By.TAG_NAME, "td")
+    for fila in tabla.find_all("tr"):
+        cols = fila.find_all("td")
         if len(cols) < 4:
             continue
-        salida, aero, num, est = [c.text.strip() for c in cols[:4]]
-        # calcular llegada +1h20m
+        salida = cols[0].get_text(strip=True)
+        aerolinea = cols[1].get_text(strip=True)
+        numero = cols[2].get_text(strip=True)
+        estado = cols[3].get_text(strip=True)
+
+        # llegada +1h20m
         try:
             t0 = datetime.strptime(salida, "%H:%M")
             llegada = (t0 + timedelta(hours=1, minutes=20)).strftime("%H:%M")
         except:
             llegada = ""
+
         vuelos.append({
             "hora_salida": salida,
-            "aerolinea": aero,
-            "numero_vuelo": num,
-            "estado": est,
+            "aerolinea": aerolinea,
+            "numero_vuelo": numero,
+            "estado": estado,
             "hora_estimada_llegada": llegada
         })
-
-    driver.quit()
     return vuelos
 
 def main():
